@@ -1,0 +1,8 @@
+type Query {
+  getItem(id: Int): Item
+}
+
+type Item {
+  id: Int
+  name: String
+}
