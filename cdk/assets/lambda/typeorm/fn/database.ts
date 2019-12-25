@@ -5,7 +5,6 @@ import {
   createConnection,
   getConnectionManager
 } from "typeorm";
-import "envkey";
 
 /**
  * Database manager class
@@ -34,8 +33,8 @@ export class Database {
 
       const connectionOptions: ConnectionOptions = {
         name: `default`,
-        type: `postgres`,
-        port: 5432,
+        type: `mysql`,
+        port: 3306,
         synchronize: true,
         logging: true,
         host: process.env.host,
@@ -44,6 +43,13 @@ export class Database {
         password: process.env.password,
         entities: [ __dirname + "/models/*.js" ]
       };
+
+      console.log({
+        host: process.env.host,
+        database: process.env.database,
+        username: process.env.username,
+        password: process.env.password
+      });
 
       connection = await createConnection(connectionOptions);
     }
