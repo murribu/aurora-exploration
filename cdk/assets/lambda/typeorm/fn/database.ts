@@ -41,7 +41,8 @@ export class Database {
         username: process.env.username,
         database: process.env.database,
         password: process.env.password,
-        entities: [ __dirname + "/models/*.js" ]
+        entities: [ __dirname + "/models/*.js" ],
+        connectTimeout: 25000
       };
 
       console.log({

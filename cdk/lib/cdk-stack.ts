@@ -7,8 +7,8 @@ import lambda = require("@aws-cdk/aws-lambda");
 import path = require("path");
 import fs = require("fs");
 
-const proj = "Temp";
-const clusterName = "TmpCluster";
+const proj = "Temp4";
+const clusterName = "TmpCluster4";
 
 export class CdkStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -17,7 +17,7 @@ export class CdkStack extends cdk.Stack {
     const vpc = new ec2.Vpc(this, `${proj}Vpc`, {
       cidr: "10.100.0.0/16",
       maxAzs: 2,
-      natGateways: 0,
+      natGateways: 1,
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -28,6 +28,11 @@ export class CdkStack extends cdk.Stack {
           cidrMask: 24,
           name: "isolated",
           subnetType: ec2.SubnetType.ISOLATED
+        },
+        {
+          cidrMask: 24,
+          name: "private",
+          subnetType: ec2.SubnetType.PRIVATE
         }
       ],
       vpnGateway: false
@@ -42,10 +47,13 @@ export class CdkStack extends cdk.Stack {
       description: `DB Cluster (${clusterName}) security group`,
       vpc: vpc
     });
+
+    securityGroup.addIngressRule(securityGroup, ec2.Port.allTraffic());
     const cluster = new rds.CfnDBCluster(this, "DatabaseCluster", {
       engine: "aurora",
       engineMode: "serverless",
       engineVersion: "5.6",
+      databaseName: clusterName,
 
       dbClusterIdentifier: clusterName,
 
@@ -54,7 +62,8 @@ export class CdkStack extends cdk.Stack {
 
       dbSubnetGroupName: new rds.CfnDBSubnetGroup(this, "db-subnet-group", {
         dbSubnetGroupDescription: `${clusterName} database cluster subnet group`,
-        subnetIds: vpc.selectSubnets().subnetIds
+        subnetIds: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE })
+          .subnetIds
       }).ref,
 
       vpcSecurityGroupIds: [ securityGroup.securityGroupId ],
@@ -134,10 +143,13 @@ export class CdkStack extends cdk.Stack {
         port: cluster.attrEndpointPort,
         username: "root",
         password: "password",
-        database: "db"
+        database: clusterName
       },
-      timeout: cdk.Duration.minutes(15),
-      memorySize: 200
+      timeout: cdk.Duration.seconds(15),
+      memorySize: 200,
+      vpc: vpc,
+      vpcSubnets: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE }),
+      securityGroup: securityGroup
     });
     const lambdaPolicyDocument = new iam.PolicyDocument();
     const lambdaPolicyStatement = new iam.PolicyStatement({
@@ -193,6 +205,14 @@ export class CdkStack extends cdk.Stack {
     const apikey = new appsync.CfnApiKey(this, `${proj}ApiKey`, {
       apiId: api.attrApiId,
       expires
+    });
+
+    new cdk.CfnOutput(this, "fnCliCmd", {
+      description: "fnCliCmd",
+      value:
+        "yarn build && cd assets/lambda/typeorm/fn && touch typeorm.zip && rm typeorm.zip && find ./ -path '*/.*' -prune -o -type f -print | zip ./typeorm.zip -@ && aws lambda update-function-code --region us-east-1 --function-name " +
+        fn.functionName +
+        " --zip-file fileb://./typeorm.zip && rm typeorm.zip && cd ../../../.."
     });
   }
 }

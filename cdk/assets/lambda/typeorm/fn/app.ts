@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Connection } from "typeorm";
+import { Connection, createConnection } from "typeorm";
 import { Item } from "./models/Item";
 import { Database } from "./database";
 
@@ -14,7 +14,21 @@ exports.lambdaHandler = async (
 
   let dbConn: Connection = await database.getConnection();
 
-  const item = await dbConn.getRepository(Item).find();
+  let item;
+  try {
+    const itemRepository = dbConn.getRepository(Item);
 
-  callback(null, item);
+    const newItem = new Item();
+    newItem.name = "Timber";
+    newItem.description = "Saw";
+    newItem.isPublished = false;
+    await itemRepository.save(newItem);
+    item = await dbConn.getRepository(Item).findOne({ id: 1 });
+    console.log({ item: JSON.stringify(item) });
+  } catch (err) {
+    item = "nope";
+    console.error(err);
+  }
+
+  return item;
 };
